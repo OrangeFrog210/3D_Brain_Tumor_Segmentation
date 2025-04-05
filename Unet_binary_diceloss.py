@@ -386,17 +386,16 @@ for batch_data in train_loader:
     print(f"Input label shape: {labels.shape}")
     break
 
-model = UNETR(
-    img_size=(160, 160, 64),
+# CREATE MODEL
+model = UNet(
+    spatial_dims=3, 
     in_channels=1,
     out_channels=2, 
-    feature_size=16, 
-    hidden_size=768,
-    mlp_dim=3072,
-    num_heads=12,
-    norm_name="instance",
-    res_block=True,
-    dropout_rate=0.2,
+    channels=(16, 32, 64, 128, 256), 
+    strides=(2, 2, 2, 2),
+    num_res_units=2,
+    dropout=0.2, 
+    norm=Norm.BATCH,
 )
 print(model)
 
