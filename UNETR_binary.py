@@ -1,15 +1,7 @@
-# Last modified: 2025-04-03
-# Started: 2025-04-01
+# =========================================
+# This script is for UNETR.
 
-# This script trains and evaluates model for MBP1413H final project, in particular, brain tumour segmentation.
-# It uses MONAI.
-# UNETR is used, instead of UNet.
-
-# ========== modify for each run ==========
 run_id = "01"
-# Exactly the same as UNETR_binary_run05.py. The bash script that runs this script allocates more time (15h)
-# Created this "long" version because UNETR run05 is running, but subsequent tries for running one with longer time allocation failed,
-# so the intension is to rerun run05 without modifying the .py code, without, by any chance, interferring with the current UNETR run.
 
 output_dir = "output/UNETR/binary/long/"
 output_dir_model = "model/UNETR/binary/long/"
@@ -20,7 +12,7 @@ best_model_name = "best_metric_model_" + type_run + "_run" + str(run_id) + ".pth
 print("Name of the best model:", best_model_name)
 
 # specify batch size
-b_size = 8 #16
+b_size = 8
 
 # set variables for early stopping
 patience_interval = 25 # this is technically 50 because validation interval is 2
@@ -30,8 +22,8 @@ min_delta = 0.01 # for experiment
 max_epoch = 300
 
 #. specify the number of images
-n_images = 369 ##369, 25, 100
-n_images_val_test = 55 ##55, 5, 20
+n_images = 369
+n_images_val_test = 55
 # =========================================
 
 from typing_extensions import dataclass_transform
@@ -93,10 +85,8 @@ from skimage.util import montage
 import skimage.transform as skTrans
 from skimage.transform import rotate
 
-#torch.cuda.empty_cache()
 
-
-#. Specify the path to the data
+# Specify the path to the data
 dataset_path = "/cluster/projects/gaitigroup/Users/Yumika/class/MBP1413H/final_pj/BraTS2020_TrainingData/MICCAI_BraTS2020_TrainingData/"
 print(dataset_path)
 
@@ -104,7 +94,7 @@ print(dataset_path)
 directory = os.environ.get("BraTS2020")
 
 # ===== Split dataset to training and testing =====
-#. Create empty lists for each set
+# Create empty lists for each set
 train_files = []
 val_files = []
 test_files = []
@@ -113,11 +103,11 @@ test_files = []
 # ===== Create a data dictionary of training and validation images=====
 # Create a data dictionary
 
-#. create a list of paths to images and labels, respectively
+# create a list of paths to images and labels, respectively
 train_test_images = [f"{dataset_path}BraTS20_Training_{volume_number:03d}/BraTS20_Training_{volume_number:03d}_flair.nii" for volume_number in range(1, n_images+1)] # train_images = [f"{dataset_path}BraTS20_Training_{volume_number:03d}/BraTS20_Training_{volume_number:03d}_flair.nii" for volume_number in range(1, n_images+1)]
 train_test_labels = [f"{dataset_path}BraTS20_Training_{volume_number:03d}/BraTS20_Training_{volume_number:03d}_seg.nii" for volume_number in range(1, n_images+1)] # train_labels = [f"{dataset_path}BraTS20_Training_{volume_number:03d}/BraTS20_Training_{volume_number:03d}_seg.nii" for volume_number in range(1, n_images+1)]
 
-#. create a data dictionary
+# create a data dictionary
 data_dicts = [{"image": image_name, "label": label_name} for image_name, label_name in zip(train_test_images, train_test_labels)]
 
 # split the data dictionary into training, validation, and testing
@@ -138,7 +128,6 @@ plt.savefig(output_dir + 'n_images_train-val-test_' + type_run + '_' + str(run_i
 
 
 # ===== Set deterministic training for reproducibility ===== 
-# . make randomness the same
 set_determinism(seed=0)
 
 
@@ -147,21 +136,16 @@ set_determinism(seed=0)
 # Step 2: Do any transforms
 # Step 3: Convert transform-applied data to torch tensors in order to do training using pytorch
 
-thrsh_asdis = 0.5 ##
-### DO NOT TRUST WHAT I WROTE ON THE RIGHT --> "Equivalent to no transformation"
+thrsh_asdis = 0.5
 orig_transforms = Compose(
     [
-        # Load images
+        # load images
         LoadImaged(keys=['image', 'label']),
 
-        # Apply transformation
-        # (this class) add[s] a new dimension that controls how many batches we have
+        # apply transformation
         EnsureChannelFirstd(keys=['image', 'label']),
 
-        # Binarize the label: all label values > threshold (e.g. 0.5) become 1, else 0
-        # AsDiscreted(keys=["label"], threshold = thrsh_asdis),
-
-        # Convert to torch tensors
+        # convert to torch tensors
         ToTensord(keys=['image', 'label'])
     ]
 )
@@ -170,21 +154,16 @@ orig_transforms = Compose(
 
 train_transforms = Compose(
     [
-        # Load images
+        # load images
         LoadImaged(keys=['image', 'label']),
-
-        # Apply transformation
 
         # add a new dimension that controls how many batches we have using the following class
         EnsureChannelFirstd(keys=['image', 'label']),
 
-        # binarize the label: all label values > threshold (e.g. 0.5) become 1, else 0
-        # AsDiscreted(keys=["label"], threshold = thrsh_asdis),
-
-        # Change the dimension.
+        # change the dimension.
         Spacingd(keys=['image', 'label'], pixdim=(1.5, 1.5, 2)), # pixdim=(H,W,D)
 
-        # Scale the intensity of the image. Apply it only to the image, not label.
+        # scale the intensity of the image. Apply it only to the image, not label.
         ScaleIntensityRanged(
             keys='image',
             a_min=-200, ## To be optimized. To select this value, 34:17 in this tutorial: https://www.youtube.com/watch?v=hqgZuatm8eE
@@ -193,44 +172,38 @@ train_transforms = Compose(
             b_max=1.0
         ),
 
-        # Crop foreground from both the image and label based on the image
+        # crop foreground from both the image and label based on the image
         CropForegroundd(keys=['image', 'label'], source_key='image'),
 
-        # Resize the image and the label
+        # resize the image and the label
         Resized(keys=['image', 'label'], spatial_size=(160, 160, 64)), # the second parameter is new dimension
 
-        # Normalize intensity of the image
+        # normalize intensity of the image
         NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True),
 
-        # Apply data augmentation
+        # apply data augmentation
         RandFlipd(keys=["image", "label"], prob=0.5, spatial_axis=0),
         RandFlipd(keys=["image", "label"], prob=0.5, spatial_axis=1),
         RandFlipd(keys=["image", "label"], prob=0.5, spatial_axis=2),        
         RandScaleIntensityd(keys="image", factors=0.1, prob=1.0),
         RandShiftIntensityd(keys="image", offsets=0.1, prob=1.0),
 
-        # Convert to torch tensors
+        # convert to torch tensors
         ToTensord(keys=['image', 'label'])
     ]
 )
 
 val_transforms = Compose(
     [
-        # Load images
+        # load images
         LoadImaged(keys=['image', 'label']),
 
-        # Apply transformation
-        # (this class) add[s] a new dimension that controls how many batches we have
         EnsureChannelFirstd(keys=['image', 'label']),
 
-        # Binarize the label: all label values > threshold (e.g. 0.5) become 1, else 0
-        # AsDiscreted(keys=["label"], threshold = thrsh_asdis),
-
-
-        # Change the dimension. Make sure it's applied to both image and label, not just image.
+        # change the dimension. Make sure it's applied to both image and label, not just image.
         Spacingd(keys=['image', 'label'], pixdim=(1.5, 1.5, 2)), # pixdim=(H,W,D)
 
-        # Scale the intensity of the image. Apply it only to the image, not label.
+        # scale the intensity of the image. Apply it only to the image, not label.
         ScaleIntensityRanged(
             keys='image',
             a_min=-200, ## To be optimized. To select this value, 34:17 in this tutorial: https://www.youtube.com/watch?v=hqgZuatm8eE
@@ -239,16 +212,16 @@ val_transforms = Compose(
             b_max=1.0
         ),
 
-        # Crop foreground from both the image and label based on the image
+        # crop foreground from both the image and label based on the image
         CropForegroundd(keys=['image', 'label'], source_key='image'),
 
-        # Resize the image and the label
+        # resize the image and the label
         Resized(keys=['image', 'label'], spatial_size=(160, 160, 64)), # the second parameter is new dimension
 
-        # Normalize intensity of the image
+        # normalize intensity of the image
         NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True),
 
-        # Convert to torch tensors
+        # convert to torch tensors
         ToTensord(keys=['image', 'label'])
     ]
 )
@@ -256,7 +229,7 @@ val_transforms = Compose(
 
 # Data loader
 print("Data loader: original images------------------")
-orig_ds = CacheDataset(data=train_files, transform=orig_transforms, cache_rate=0.5, num_workers=4) ## cache_rate=1.0 is going to load all the images into the memory before even training the model. set it to 0 for both train and val.
+orig_ds = CacheDataset(data=train_files, transform=orig_transforms, cache_rate=0.5, num_workers=4)
 orig_loader = DataLoader(orig_ds, batch_size=b_size, shuffle=True, num_workers=1)
 
 print("Data loader: train images----------------------")
@@ -267,10 +240,10 @@ print("Data loader: validation images-----------------")
 val_ds = CacheDataset(data=val_files, transform=val_transforms, cache_rate=0.5, num_workers=4)
 val_loader = DataLoader(val_ds, batch_size=b_size, shuffle=True, num_workers=1)
 
-print("\Data loaded")
+print("Data loaded")
 
-orig_patient = first(orig_loader) ### no transform
-train_transformed_patient = first(train_loader) ## train_loader contains all the image
+orig_patient = first(orig_loader)
+train_transformed_patient = first(train_loader)
 val_transformed_patient = first(val_loader)
 
 print(torch.min(train_transformed_patient['image']))
@@ -279,7 +252,6 @@ print(torch.max(train_transformed_patient['image']))
 
 # Visualize transformation
 print("\nVisualizing transformation")
-## Check if our function is working
 
 # Extract the 2D slice (z=35) for each image
 z1 = 35
@@ -401,11 +373,6 @@ ax[2, 1].set_title("Label - validation transform")
 
 fig.savefig(output_dir + "valTransformedSlice-valTransformedLabel_" + type_run + "_" + str(run_id) + ".png", dpi=300)
 
-#affine = np.eye(4)
-
-
-# We are performing the following operation because during training, we need to pass each batch to GPU
-# Notes: Most of the workstations have >1 GPU => we can parallelize it using multiple GPU cores. We can split tasks by GPU (e.g. do first part in GPU 1 and do the rest in GPU 2). This technique is important in job or job hunting.
 device = torch.device("cuda:0")
 
 for batch_data in train_loader:
@@ -413,38 +380,24 @@ for batch_data in train_loader:
         batch_data["image"].to(device),
         batch_data["label"].to(device),
     )
-    print(f"Input image shape: {inputs.shape}") # should B x C X H X W X D
+    print(f"Input image shape: {inputs.shape}")
     print(f"Input label shape: {labels.shape}")
     break
 
-
-# CREATE MODEL
-# model = UNet(
-#     spatial_dims=3, # 3 because we have height width and depth
-#     in_channels=1,
-#     out_channels=2, # binary segmentation
-#     channels=(16, 32, 64, 128, 256), # this is # of convolutional kernal in each ___ block. The fact that there are 5 values tells us there are 5 encoder layers
-#     strides=(2, 2, 2, 2), # => After the first encoder layer, we'll have a stride of 2. Stride means that each time it reduces size of input to the encoder layer.
-#     num_res_units=2,
-#     dropout=0.2, ### This would do what? ==> Increase 0.1 it to 0.3 because the widely fluctuating validation accuracy/metric hints at overfitting.
-#     norm=Norm.BATCH,
-# )
 model = UNETR(
-    img_size=(160, 160, 64), # dimension of input image
-    in_channels=1, # dimension of input channels
-    out_channels=2, # dimension of output channels. in multi-class, should be set to 4.
-    feature_size=16, # dimension of network feature size. can set to 32 or 64 depending on GPU capacity
-    hidden_size=768, ## dimension of hidden layer. ##WHY is default 768?
-    mlp_dim=3072, ## dimension of the feedforward layer.  ## WHY is default 3072?
-    num_heads=12, ## number of attention heads. ## what is attention heads? why is default 12?
-    #pos_embed="perceptron", ## This threw an error: "TypeError: UNETR.__init__() got an unexpected keyword argument 'pos_embed'"
-    norm_name="instance", ## what is "instance" norm? Is there batch norm option?
-    res_block=True, ##
+    img_size=(160, 160, 64),
+    in_channels=1,
+    out_channels=2, 
+    feature_size=16, 
+    hidden_size=768,
+    mlp_dim=3072,
+    num_heads=12,
+    norm_name="instance",
+    res_block=True,
     dropout_rate=0.2,
 )
 print(model)
 
-# Input tensors and model weights have to be on GPU
 if torch.cuda.is_available():
     model = model.cuda()
 
@@ -456,17 +409,17 @@ print("-------------------------")
 # Define loss function, optimizer, and evaluation metric
 print("\nDefining loss function, optimizer, and evaluation metric")
 #loss_function = DiceLoss(to_onehot_y=True, softmax=True)
-loss_function = DiceCELoss(to_onehot_y=True, softmax=True) # What is softmax? They call it logists. Logists are probability map. We need to change probability map to binary or smth, that's why we need softmax=True.
-optimizer = torch.optim.Adam(model.parameters(), 1e-4) #1e-4
-dice_metric = DiceMetric(include_background=False, reduction="mean") #include_background=False means we don't care if we can detect background (background channel of the output of the model) correctly or not. # reduction="mean" will give mean of all batches
+loss_function = DiceCELoss(to_onehot_y=True, softmax=True) 
+optimizer = torch.optim.Adam(model.parameters(), 1e-4) 
+dice_metric = DiceMetric(include_background=False, reduction="mean")
 precision_metric = ConfusionMatrixMetric(include_background=False, metric_name="precision")
 recall_metric = ConfusionMatrixMetric(include_background=False, metric_name="recall")
 HD_metric = HausdorffDistanceMetric(include_background=False)
 
 
 # Define maximum number of epochs and validation interval
-max_epochs = max_epoch # depending on the epoch we set, model training could take a while. # of epochs is the number of times we want to iterate over each data. (e.g. epoch = 100 means we iterate over each data 100 times). # AA had max_epochs=700 because he had a lot of data It took 1 week to train.
-val_interval = 2 ### meaning?  # We can set it to 1, 2, 5, etc. It depends on the data size we have.
+max_epochs = max_epoch 
+val_interval = 2
 
 # Initialize variables for tracking best metric and associated epoch
 best_metric = -1
@@ -484,8 +437,8 @@ recall_values = []
 val_loss_values = []
 HD_values = []
 
-# Define post-processing transforms for predictions and labels ==> similar to train .. transform but we apply it after prediction and label.
-post_pred = Compose([AsDiscrete(argmax=True, to_onehot=2)]) # discretize output. Need to make to one hot vector so that we can compare with model output. channel 0: background, channel 1: foreground
+# Define post-processing transforms for predictions and labels
+post_pred = Compose([AsDiscrete(argmax=True, to_onehot=2)])
 post_label = Compose([AsDiscrete(to_onehot=2)])
 
 # Define counter for early stopping
@@ -493,28 +446,27 @@ counter_early_stopping = 0
 
 # Iterate over epochs
 print("\nIterate over epochs")
-for epoch in range(max_epochs): # start from 0
+for epoch in range(max_epochs):
     print("-" * 10)
     print(f"epoch {epoch + 1}/{max_epochs}")
 
     # Set model to training mode
-    model.train() # set all the randomness of the model ... ### The randomness we have in the model is dropout.
+    model.train()
     epoch_loss = 0
     step = 0
 
     # Iterate over batches in the training loader i.e. iterate over all the data in train loader
 
-    for batch_data in train_loader: # 8 x 1 x 96 x 96 x 96 (BCHWD)
+    for batch_data in train_loader: 
         step += 1
 
         # Option 2: When on GPU
         inputs = batch_data["image"].cuda()
         labels = batch_data["label"].cuda()
 
-        # * Make the segmentation a binary segmentation problem. This step is extremely important. The code can fail if we don't include this step.
-        labels[labels > 0] = 1 # This will make class 1-3 all have the value 1
+        # Make the segmentation a binary segmentation problem. 
+        labels[labels > 0] = 1
 
-        ## ** Memorize the following 5 steps.
         # Zero the gradients
         optimizer.zero_grad() # clears out ... from previous step
         # Forward pass
@@ -522,22 +474,22 @@ for epoch in range(max_epochs): # start from 0
         # Compute loss
         loss = loss_function(outputs, labels)
         # Backward pass
-        loss.backward() # c.f. tutorial 1. It computes the gradient.
+        loss.backward()
         # Update weights
-        optimizer.step() # gets the gradient and applies (gradient to) gradient descent
+        optimizer.step()
         # Update epoch loss
         epoch_loss += loss.item()
         print(f"{step}/{len(train_ds) // train_loader.batch_size}, " f"train_loss: {loss.item():.4f}")
 
     # Calculate average epoch loss
-    epoch_loss /= step # average of all loss with__ the list
+    epoch_loss /= step 
     epoch_loss_values.append(epoch_loss)
     print(f"epoch {epoch + 1} average loss: {epoch_loss:.4f}")
 
     # Perform validation at specified intervals
     if (epoch + 1) % val_interval == 0:
         model.eval()
-        with torch.no_grad(): # I am in the validation mode, so I don't care about gradients.
+        with torch.no_grad(): 
 
             val_interval_loss = 0
             step_val = 0
@@ -551,12 +503,10 @@ for epoch in range(max_epochs): # start from 0
                 val_labels[val_labels > 0] = 1
 
                 # Define ROI size and sliding window batch size
-                roi_size = (160, 160, 64) #(160, 160, 160)
+                roi_size = (160, 160, 64) 
                 sw_batch_size = 4
-                # Perform sliding window inference.   WHY is it IMPT to do sliding window inference?: We don't want __ to speak to specific size. Without sw_inference, we'll have to get 96 x 96 for each.
-                val_outputs = sliding_window_inference(val_inputs, roi_size, sw_batch_size, model) #sw: sliding window. This step crops 96 by 96 automatically from validation, applies model, etc.
-                #print("past sliding window inference in validation")
-
+                # Perform sliding window inference. 
+                val_outputs = sliding_window_inference(val_inputs, roi_size, sw_batch_size, model)
 
                 val_loss = loss_function(val_outputs, val_labels).item()
                 print("val_loss at point 1:", val_loss)
@@ -608,8 +558,7 @@ for epoch in range(max_epochs): # start from 0
                 best_metric = metric
                 best_metric_epoch = epoch + 1
                 # Save the model with the best metric
-                torch.save(model.state_dict(), os.path.join(output_dir_model, best_model_name)) # type of the model is pt or pth
-                # torch.save(model.state_dict(), output_dir_model + best_model_name)
+                torch.save(model.state_dict(), os.path.join(output_dir_model, best_model_name))
                 print("saved new best metric model")
 
             # Print current and best metric values
@@ -636,13 +585,10 @@ for epoch in range(max_epochs): # start from 0
                     print("Stopping early at epoch " + str(epoch + 1))
                     break
 
-# The 16 shown below is because of batch size.
-# Each of 1/16, 2/16, 3/16, .. is a step. (16 steps/epoch, it seems)
-
 # Indicate the end of training and what the best metric was
 print(f"train completed, best_metric: {best_metric:.4f} " f"at epoch: {best_metric_epoch}")
 
-# <Plot epoch average loss and validation metric>
+# ===== Plot epoch average loss and validation metric=====
 # define plot parameters
 fig, ax = plt.subplots(1, 3, figsize=(20, 5))
 
@@ -700,7 +646,6 @@ ax[2].plot(x_vals, HD_values, color='grey', label='Hausdorff distance')
 fig.savefig(output_dir + "val_precision-recall-HD_" + type_run + "_" + str(run_id) + ".png", dpi=300)
 
 # Plot a precision recall curve
-### Ideally, we add area under the curve
 fig, ax = plt.subplots(1, 1, figsize=(10, 10))
 ax.set_title("Precision-Recall Curve")
 ax.set_xlabel("Recall")
@@ -708,7 +653,6 @@ ax.set_ylabel("Precision")
 ax.set_xlim([0, 1.0])
 ax.set_ylim([0, 1.0])
 ax.scatter(recall_values, precision_values, color="orange")
-#ax.plot(recall_values, precision_values, color="orange")
 fig.savefig(output_dir + "precision-recall_curve_" + type_run + "_" + str(run_id) + ".png", dpi=300)
 
 
@@ -736,9 +680,6 @@ with torch.no_grad():
         ## Make the segmentation a binary segmentation problems
         val_labels_binary = val_data["label"].cuda()
         val_labels_binary[val_labels_binary > 0] = 1
-        ## print("val_labels_binary:", val_labels_binary)
-        ## val_labels[val_labels > 0] = 1
-
 
         # Plot three slices ----- 
         fig, ax = plt.subplots(3, 3, figsize=(15, 15))
@@ -790,41 +731,21 @@ with torch.no_grad():
 
 
         # Save the images as nifti images (.nii) -----
-        val_image_np = val_data["image"][0, 0].cpu().numpy().astype(np.float64) ## val_image_np = val_data["image"][0, 0].cpu().numpy()
-        val_label_np = val_data["label"][0, 0].cpu().numpy().astype(np.float64) ## val_label_np = val_data["label"][0, 0].cpu().numpy()
-        val_pred_np = torch.argmax(val_outputs, dim=1).detach().cpu()[0].numpy().astype(np.float64) #torch.argmax(val_outputs, dim=1).detach().cpu()[0].numpy() # torch.argmax(val_outputs, dim=1)[0].cpu().numpy().astype(np.float64) ##torch.argmax(val_outputs, dim=1)[0].detach().cpu().numpy() # this is likely to be our prediction
-        #val_pred_np_temp = val_outputs.cpu()[0].
-
-        #print("val_image_np:", val_image_np)
-        #print("val_label_np:", val_label_np)
-        #print("val_pred_np:", val_pred_np)
-        #print("torch.argmax(val_outputs, dim=1).detach().cpu()[0].numpy():", torch.argmax(val_outputs, dim=1).detach().cpu()[0].numpy())
-
-        # print("torch.argmax(val_outputs, dim=1)[0].cpu().numpy():", torch.argmax(val_outputs, dim=1)[0].cpu().numpy())
-        
-        # check the type of the variables to be saved
-        #print("type of val_image_np:", type(val_image_np))
-        #print("type of val_label_np:", type(val_label_np))
-        #print("type of val_pred_np:", type(val_pred_np))
-        #print("type of val_pred_np_temp:", type(val_pred_np_temp))
+        val_image_np = val_data["image"][0, 0].cpu().numpy().astype(np.float64) 
+        val_label_np = val_data["label"][0, 0].cpu().numpy().astype(np.float64) 
+        val_pred_np = torch.argmax(val_outputs, dim=1).detach().cpu()[0].numpy().astype(np.float64) 
 
         # save .nii files using nibabel
         nib.save(nib.Nifti1Image(val_image_np, affine=np.eye(4)), output_nii + "val_image_step" + str(step) + "_run" + str(run_id) + ".nii")
         nib.save(nib.Nifti1Image(val_label_np, affine=np.eye(4)), output_nii + "val_label_step" + str(step) + "_run" + str(run_id) + ".nii")
         nib.save(nib.Nifti1Image(val_pred_np, affine=np.eye(4)), output_nii + "val_prediction_step" + str(step) + "_run" + str(run_id) + ".nii")
-        #nib.save(nib.Nifti1Image(val_pred_np_temp, affine=np.eye(4)), output_nii + "temp_val_prediction_step" + str(step) + "_run" + str(run_id) + ".nii")
 
         # Break loop after 3 iterations for visualization
-        if step == 3: # i == 2
+        if step == 3:
             break
 
 
 # ===== Model performance on test set =====
-##Define the list of test images
-## originally we do this on test set, but here for this dataset we don't have labels for test set because it's a challenge dataset
-## so here the mean dice score
-## Create test data dictionary
-
 test_data = test_files ## test_data = val_files
 
 # Define original test transforms
@@ -883,7 +804,7 @@ with torch.no_grad():
     HD_metric.reset()
 
 # Print the metric, precision, and recall on the test set
-print("Metric on Test Set: ", metric_org) # as we used validation data now should be the same as best score
+print("Metric on Test Set: ", metric_org)
 print("Precision on Test Set :", precision_org)
 print("Recall on Test Set:", recall_org)
 print("Hausdorff distance on Test Set:", HD_dist_org)
@@ -909,13 +830,6 @@ with torch.no_grad():
         test_label_np = test_data["label"][0, 0].cpu().numpy()
         test_pred_np = torch.argmax(test_outputs, dim=1).detach().cpu()[0].numpy().astype(np.float64)
 
-        #print("test_image_np:", test_image_np)
-        #print("test_label_np:", test_label_np)
-        #print("test_pred_np:", test_pred_np)
-
-        #print("type of test_image_np:", type(test_image_np))
-        #print("type of test_label_np:", type(test_label_np))
-        #print("type of test_pred_np:", type(test_pred_np))
 
         # save .nii files using nibabel
         nib.save(nib.Nifti1Image(test_image_np, affine=np.eye(4)), output_nii + "test_image_step" + str(step_test) + "_run" + str(run_id) + ".nii")
