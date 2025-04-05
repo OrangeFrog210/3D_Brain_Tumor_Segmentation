@@ -15,8 +15,8 @@ print("Name of the best model:", best_model_name)
 b_size = 8
 
 # set variables for early stopping
-patience_interval = 25 # this is technically 50 because validation interval is 2
-min_delta = 0.01 # for experiment
+patience_interval = 25 # this corresponds to 50 epochs because validation interval is 2
+min_delta = 0.01
 
 # set the number of epochs
 max_epoch = 300
