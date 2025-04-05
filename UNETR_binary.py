@@ -136,7 +136,6 @@ set_determinism(seed=0)
 # Step 2: Do any transforms
 # Step 3: Convert transform-applied data to torch tensors in order to do training using pytorch
 
-thrsh_asdis = 0.5
 orig_transforms = Compose(
     [
         # load images
