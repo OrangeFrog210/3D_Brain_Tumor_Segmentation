@@ -160,14 +160,14 @@ train_transforms = Compose(
         EnsureChannelFirstd(keys=['image', 'label']),
 
         # change the dimension.
-        Spacingd(keys=['image', 'label'], pixdim=(1.5, 1.5, 2)), # pixdim=(H,W,D)
+        Spacingd(keys=['image', 'label'], pixdim=(1.5, 1.5, 2)), 
 
         # scale the intensity of the image. Apply it only to the image, not label.
         ScaleIntensityRanged(
             keys='image',
-            a_min=-200, ## To be optimized. To select this value, 34:17 in this tutorial: https://www.youtube.com/watch?v=hqgZuatm8eE
-            a_max=200, ## To be optimized.
-            b_min=0.0, ##
+            a_min=-200, 
+            a_max=200, 
+            b_min=0.0, 
             b_max=1.0
         ),
 
@@ -175,7 +175,7 @@ train_transforms = Compose(
         CropForegroundd(keys=['image', 'label'], source_key='image'),
 
         # resize the image and the label
-        Resized(keys=['image', 'label'], spatial_size=(160, 160, 64)), # the second parameter is new dimension
+        Resized(keys=['image', 'label'], spatial_size=(160, 160, 64)), 
 
         # normalize intensity of the image
         NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True),
@@ -200,14 +200,14 @@ val_transforms = Compose(
         EnsureChannelFirstd(keys=['image', 'label']),
 
         # change the dimension. Make sure it's applied to both image and label, not just image.
-        Spacingd(keys=['image', 'label'], pixdim=(1.5, 1.5, 2)), # pixdim=(H,W,D)
+        Spacingd(keys=['image', 'label'], pixdim=(1.5, 1.5, 2)), 
 
         # scale the intensity of the image. Apply it only to the image, not label.
         ScaleIntensityRanged(
             keys='image',
-            a_min=-200, ## To be optimized. To select this value, 34:17 in this tutorial: https://www.youtube.com/watch?v=hqgZuatm8eE
-            a_max=200, ## To be optimized.
-            b_min=0.0, ##
+            a_min=-200, 
+            a_max=200, 
+            b_min=0.0, 
             b_max=1.0
         ),
 
@@ -215,7 +215,7 @@ val_transforms = Compose(
         CropForegroundd(keys=['image', 'label'], source_key='image'),
 
         # resize the image and the label
-        Resized(keys=['image', 'label'], spatial_size=(160, 160, 64)), # the second parameter is new dimension
+        Resized(keys=['image', 'label'], spatial_size=(160, 160, 64)), 
 
         # normalize intensity of the image
         NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True),
