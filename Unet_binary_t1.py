@@ -1,5 +1,5 @@
 # =========================================
-# This script is for UNet T1ce
+# This script is for UNet T1
 run_id = "01" 
 
 output_dir = "output/Unet/binary/t1/"
